@@ -1,0 +1,19 @@
+#ifndef __MUSIC_PLAYER_H
+#define __MUSIC_PLAYER_H
+
+#include "AudioPlayer.h"
+
+class MusicPlayer : public AudioPlayer {
+public:
+	MusicPlayer(StreamDecoder* decoder); //Must not be used outside OpenALManager (public for make_shared)
+	static void SetDefaultVolume(float volume) { default_volume = volume; }
+	const static float GetDefaultVolume() { return default_volume; }
+private:
+	StreamDecoder* decoder;
+	int GetNextData(uint8* data, int length);
+	bool SetUpALSourceIdle() const;
+	static std::atomic<float> default_volume;
+	friend class OpenALManager;
+};
+
+#endif

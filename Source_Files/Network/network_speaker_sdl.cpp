@@ -37,11 +37,12 @@
 
 #include    "network_sound.h"
 #include    "network_speaker_sdl.h"
-
+#include    "network_audio_shared.h"
 #include    "network_distribution_types.h"
 #include    "CircularQueue.h"
 #include    "world.h"   // local_random()
-#include "Mixer.h"
+#include    "OpenALManager.h"
+#include    "SoundManager.h"
 
 #ifdef SPEEX
 #include "network_speex.h"
@@ -69,6 +70,9 @@ static  NetworkSpeakerSoundBufferDescriptor	sNoiseBufferDesc;
 static  int                         		sDryDequeues = 0;
 static  bool                        		sSpeakerIsOn = false;
 
+static std::shared_ptr<StreamPlayer>        streamPlayer = nullptr;
+static uint32                               lastFeedTick;
+static const uint32                         timeCloseAudio = 250; //machine tick
 
 OSErr
 open_network_speaker() {
@@ -133,6 +137,8 @@ queue_network_speaker_data(byte* inData, short inLength) {
                 }
     
                 sSpeakerIsOn = true;
+                if (OpenALManager::Get())
+                    OpenALManager::Get()->ApplyVolumeFilter(SoundManager::instance()->GetNetmicVolumeAdjustment() * 1.f / MAXIMUM_SOUND_VOLUME);
             }
     
             // Enqueue the actual sound data.
@@ -147,8 +153,41 @@ queue_network_speaker_data(byte* inData, short inLength) {
 
 void
 network_speaker_idle_proc() {
-    if(sSpeakerIsOn)
-	    Mixer::instance()->EnsureNetworkAudioPlaying();
+    if (sSpeakerIsOn && OpenALManager::Get()) {
+
+        auto micData = dequeue_network_speaker_data();
+
+        if (!micData && machine_tick_count() - lastFeedTick > timeCloseAudio) {
+            sSpeakerIsOn = false;
+            micData = &sNoiseBufferDesc;
+        }
+        
+        if (micData) {
+
+            bool newPlayer = !streamPlayer;
+            if (streamPlayer) { //we already have a player
+                streamPlayer->Lock();
+                newPlayer = !streamPlayer->IsActive();
+                if (!newPlayer) { //our player is still running, let's give it more data
+                    streamPlayer->FeedData(micData->mData, micData->mLength);
+                }
+                streamPlayer->Unlock();
+            }
+
+            if (newPlayer) { //we don't have a player yet or it isn't active anymore
+                streamPlayer = OpenALManager::Get()->PlayStream(micData->mData, micData->mLength, kNetworkAudioSampleRate, kNetworkAudioIsStereo, kNetworkAudioIs16Bit);
+                streamPlayer->SetFilterable(false);
+            }
+
+            if (is_sound_data_disposable(micData)) {
+                release_network_speaker_buffer(micData->mData);
+            }
+
+            if (!sSpeakerIsOn) {
+                OpenALManager::Get()->RemoveVolumeFilter();
+            }
+        }
+    }
 }
 
 
@@ -157,30 +196,25 @@ dequeue_network_speaker_data() {
     // We need this to stick around between calls
     static NetworkSpeakerSoundBufferDescriptor    sBufferDesc;
 
-    // If there is actual sound data, reset the "ran dry" count and return a pointer to the buffer descriptor
+    // If there is actual sound data, return a pointer to the buffer descriptor
     if(sSoundBuffers.getCountOfElements() > 0) {
         sDryDequeues = 0;
         sBufferDesc = sSoundBuffers.peek();
         sSoundBuffers.dequeue();
+        lastFeedTick = machine_tick_count();
         return &sBufferDesc;
     }
-    // If there's no data available, inc the "ran dry" count and return either a noise buffer or NULL.
-    else {
-        sDryDequeues++;
-        if(sDryDequeues > kMaxDryDequeues) {
-            sSpeakerIsOn = false;
-            return NULL;
-        }
-        else
-            return &sNoiseBufferDesc;
-    }
+
+    return NULL;
 }
 
 
 void
 close_network_speaker() {
-    // Tell the audio system not to get our data anymore
-	Mixer::instance()->StopNetworkAudio();
+    if (streamPlayer) {
+        streamPlayer->Stop();
+        streamPlayer.reset();
+    }
 
     // Bleed the queue dry of any leftover data
     NetworkSpeakerSoundBufferDescriptor*  theDesc;

@@ -155,6 +155,7 @@ May 22, 2003 (Woody Zenfell):
 #include "Console.h"
 #include "ViewControl.h"
 #include "InfoTree.h"
+#include "OpenALManager.h"
 
 /*
 //anybody on the receiving pad of a teleport should explode (what happens to invincible guys?)
@@ -759,7 +760,13 @@ void update_players(ActionQueues* inActionQueuesToUse, bool inPredictive)
 						dynamic_world->speaking_player_index= player_index;
 					} 
 
-					if (player_index==local_player_index) set_interface_microphone_recording_state(true);
+					if (player_index == local_player_index) {
+						if (SoundManager::instance()->IsActive() && SoundManager::instance()->parameters.mute_while_transmitting) {
+							OpenALManager::Get()->ApplyVolumeFilter(0);
+						}
+
+						set_interface_microphone_recording_state(true);
+					}
 				}
 			}
 			else
@@ -767,7 +774,13 @@ void update_players(ActionQueues* inActionQueuesToUse, bool inPredictive)
 				if (dynamic_world->speaking_player_index==player_index)
 				{
 					dynamic_world->speaking_player_index= NONE;
-					if (player_index==local_player_index) set_interface_microphone_recording_state(false);
+					if (player_index == local_player_index) {
+						if (SoundManager::instance()->IsActive() && SoundManager::instance()->parameters.mute_while_transmitting) {
+							OpenALManager::Get()->RemoveVolumeFilter();
+						}
+
+						set_interface_microphone_recording_state(false);
+					}
 				}
 			}
 #endif // !defined(DISABLE_NETWORKING)
@@ -922,7 +935,7 @@ void damage_player(
 						{
 							short action= definition->death_action;
 							
-							play_object_sound(player->object_index, definition->death_sound);
+							play_object_sound(player->object_index, definition->death_sound, player_index == current_player_index);
 
 							if (action==NONE)
 							{
@@ -971,7 +984,7 @@ void damage_player(
 	}
 	
 	{
-		if (!PLAYER_IS_DEAD(player)) play_object_sound(player->object_index, definition->sound);
+		if (!PLAYER_IS_DEAD(player)) play_object_sound(player->object_index, definition->sound, player_index == current_player_index);
 		if (player_index==current_player_index)
 		{
 			if (definition->fade!=NONE) start_fade((definition->damage_threshhold!=NONE&&damage_amount>definition->damage_threshhold) ? (definition->fade+1) : definition->fade);
