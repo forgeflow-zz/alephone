@@ -26,6 +26,7 @@
 #include "cseries.h"
 #include "csalerts.h"
 #include "Logging.h"
+#include "OpenALManager.h"
 
 #include <algorithm>
 
@@ -45,7 +46,6 @@
 #include "Movie.h"
 #include "interface.h"
 #include "screen.h"
-#include "Mixer.h"
 #include "preferences.h"
 
 #ifdef __WIN32__
@@ -204,9 +204,18 @@ void Movie::PromptForRecording()
 
 void Movie::StartRecording(std::string path)
 {
-	StopRecording();
+    if (!OpenALManager::Get()) return;
+
+	StopRecording(); 
 	moviefile = path;
-	SDL_PauseAudio(IsRecording());
+    OpenALManager::Get()->Stop();
+    if (IsRecording()) {
+        OpenALManager::Get()->SetUpRecordingDevice();
+    }
+    else {
+        OpenALManager::Get()->SetUpPlayingDevice();
+    }
+    OpenALManager::Get()->Start();
 }
 
 bool Movie::IsRecording()
@@ -220,6 +229,8 @@ bool Movie::Setup()
         return false;
     if (!av)
         return false;
+    if (!OpenALManager::Get())
+        return false;
 
     bool success = true;
     std::string err_msg;
@@ -232,8 +243,6 @@ bool Movie::Setup()
 										0);
 	success = (temp_surface != NULL);
 	if (!success) err_msg = "Could not create SDL surface";
-
-    Mixer *mx = Mixer::instance();
 
 	const auto fps = std::max(get_fps_target(), static_cast<int16_t>(30));
     
@@ -360,6 +369,8 @@ bool Movie::Setup()
     // Open output audio stream
     AVCodec *audio_codec;
     AVStream *audio_stream;
+    AVSampleFormat input_fmt = mapping_openal_ffmpeg.at(OpenALManager::Get()->GetRenderingFormat());
+    in_bps = av_get_bytes_per_sample(input_fmt);
     if (success)
     {
         audio_codec = avcodec_find_encoder(AV_CODEC_ID_VORBIS);
@@ -377,7 +388,7 @@ bool Movie::Setup()
         audio_stream->codecpar->codec_id = audio_codec->id;
         audio_stream->codecpar->codec_type = AVMEDIA_TYPE_AUDIO;
         audio_stream->codecpar->format = AV_SAMPLE_FMT_FLTP;
-        audio_stream->codecpar->sample_rate = mx->obtained.freq;
+        audio_stream->codecpar->sample_rate = OpenALManager::Get()->GetFrequency();
         audio_stream->codecpar->channel_layout = AV_CH_LAYOUT_STEREO;
         audio_stream->codecpar->channels = 2;
 
@@ -387,7 +398,7 @@ bool Movie::Setup()
     }
     if (success)
     {     
-        av->audio_ctx->time_base = AVRational{ 1, mx->obtained.freq };
+        av->audio_ctx->time_base = AVRational{ 1, OpenALManager::Get()->GetFrequency() };
 
         if (av->fmt_ctx->oformat->flags & AVFMT_GLOBALHEADER)
             av->audio_ctx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
@@ -408,7 +419,7 @@ bool Movie::Setup()
     {
         // init resampler
         av->swr_context = swr_alloc_set_opts(av->swr_context, av->audio_ctx->channel_layout, av->audio_ctx->sample_fmt, av->audio_ctx->sample_rate,
-            av->audio_ctx->channel_layout, AV_SAMPLE_FMT_S16, av->audio_ctx->sample_rate, 0, NULL);
+            av->audio_ctx->channel_layout, input_fmt, av->audio_ctx->sample_rate, 0, NULL);
 
         success = av->swr_context && swr_init(av->swr_context) >= 0;
         if (!success) err_msg = "Could not initialize resampler";
@@ -431,7 +442,7 @@ bool Movie::Setup()
     }
     if (success)
     {
-        success = av_samples_alloc(&av->audio_data, NULL, av->audio_ctx->channels, av->audio_ctx->frame_size, AV_SAMPLE_FMT_S16, 0) >= 0;
+        success = av_samples_alloc(&av->audio_data, NULL, av->audio_ctx->channels, av->audio_ctx->frame_size, input_fmt, 0) >= 0;
         if (!success) err_msg = "Could not allocate audio data buffer";
     }
     if (success)
@@ -457,7 +468,7 @@ bool Movie::Setup()
     if (success)
     {
         video_stream->time_base = AVRational{1, fps};
-        audio_stream->time_base = AVRational{1, mx->obtained.freq};
+        audio_stream->time_base = AVRational{1, OpenALManager::Get()->GetFrequency()};
         success = avformat_write_header(av->fmt_ctx, NULL) >= 0;
         if (!success) err_msg = "Could not create write video header";
     }
@@ -466,9 +477,9 @@ bool Movie::Setup()
     if (success)
     {
         videobuf.resize(av->video_bufsize);
-        audiobuf.resize(2 * 2 * mx->obtained.freq / fps);
+        audiobuf.resize(2 * av_get_bytes_per_sample(input_fmt) * OpenALManager::Get()->GetFrequency() / fps);
 
-		if (mx->obtained.freq % fps != 0)
+		if (OpenALManager::Get()->GetFrequency() % fps != 0)
 		{
 			// TODO: fixme!
 			success = false;
@@ -577,7 +588,7 @@ void Movie::EncodeAudio(bool last)
     
     // bps: bytes per sample
     int channels = acodec->channels;
-    int read_bps = 2;
+    int read_bps = in_bps;
     int write_bps = av_get_bytes_per_sample(acodec->sample_fmt);
     
     int max_read = acodec->frame_size * read_bps * channels;
@@ -743,12 +754,12 @@ void Movie::AddFrame(FrameType ftype)
 	}
 #endif
 	
-	int audio_bytes_per_frame = audiobuf.size();
-	Mixer *mx = Mixer::instance();
-	float old_vol = mx->main_volume;
-	mx->SetVolume(sound_preferences->video_export_volume_db);
-	mx->Mix(&audiobuf.front(), audio_bytes_per_frame / 4, true, true, true);
-	mx->main_volume = old_vol;
+	int bytes = audiobuf.size();
+    int frameSize = 2 * in_bps;
+    auto oldVol = OpenALManager::Get()->GetComputedVolume();
+    OpenALManager::Get()->SetDefaultVolume(OpenALManager::From_db(sound_preferences->video_export_volume_db));
+    OpenALManager::Get()->GetPlayBackAudio(&audiobuf.front(), bytes / frameSize);
+    OpenALManager::Get()->SetDefaultVolume(oldVol);
 	
 	SDL_SemPost(encodeReady);
 }
@@ -854,7 +865,10 @@ void Movie::StopRecording()
     }
 
 	moviefile = "";
-	SDL_PauseAudio(false);
+    if (OpenALManager::Get()) {
+        OpenALManager::Get()->SetUpPlayingDevice();
+        OpenALManager::Get()->Start();
+    }
 }
 
 #endif

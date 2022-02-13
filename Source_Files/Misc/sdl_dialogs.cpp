@@ -1064,7 +1064,7 @@ void play_dialog_sound(int which)
 {
 	if (dialog_sound_definitions[which] != NONE)
 	{
-		SoundManager::instance()->PlaySound(dialog_sound_definitions[which], 0, NONE);
+		SoundManager::instance()->PlaySound(dialog_sound_definitions[which], 0, NONE, true);
 	}
 }
 
