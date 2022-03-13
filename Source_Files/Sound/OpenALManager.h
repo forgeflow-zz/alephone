@@ -84,13 +84,12 @@ public:
 	std::shared_ptr<StreamPlayer> PlayStream(uint8* data, int length, int rate, bool stereo, bool sixteen_bit);
 	std::shared_ptr<CallBackableStreamPlayer> PlayStream(CallBackStreamPlayer callback, int length, int rate, bool stereo, bool sixteen_bit);
 	void StopSound(short sound_identifier, short source_identifier);
-	AudioPlayer::AudioSource PickAvailableSource();
+	AudioPlayer::AudioSource PickAvailableSource(const AudioPlayer* player);
 	std::shared_ptr<SoundPlayer> GetSoundPlayer(short identifier, short source_identifier, bool sound_identifier_only = false) const;
 	void UpdateListener(world_location3d listener);
 	world_location3d GetListener() const { return listener_location; }
 	void SetDefaultVolume(float volume);
 	float GetComputedVolume(bool filtered = true) const { return default_volume * (filters_volume.empty() || !filtered ? 1 : filters_volume.front()); }
-	bool SimulateSound(SoundParameters soundParameters) const;
 	virtual void SetUpRecordingDevice();
 	virtual void SetUpPlayingDevice();
 	virtual int GetFrequency() const;

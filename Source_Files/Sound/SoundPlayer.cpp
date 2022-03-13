@@ -14,6 +14,30 @@ SoundPlayer::SoundPlayer(const SoundInfo& header, const SoundData& sound_data, S
 	start_tick = machine_tick_count();
 }
 
+//Simulate what the volume of our sound would be if we play it
+//If the volume is 0 then we just don't play the sound and drop it
+float SoundPlayer::Simulate(SoundParameters soundParameters) {
+	if (soundParameters.local && !soundParameters.stereo_parameters.is_panning) return 1; //ofc we play all local sounds without stereo panning
+	if (soundParameters.stereo_parameters.is_panning) return soundParameters.stereo_parameters.gain_global;
+
+	const auto listener = OpenALManager::Get()->GetListener(); //if we don't have a listener on a non local sound, there is a problem
+	float distance = std::sqrt(
+		std::pow((float)(soundParameters.source_location3d.point.x - listener.point.x) / WORLD_ONE, 2) +
+		std::pow((float)(soundParameters.source_location3d.point.y - listener.point.y) / WORLD_ONE, 2) +
+		std::pow((float)(soundParameters.source_location3d.point.z - listener.point.z) / WORLD_ONE, 2)
+	);
+
+	const bool obstruction = (soundParameters.obstruction_flags & _sound_was_obstructed) || (soundParameters.obstruction_flags & _sound_was_media_obstructed);
+	const auto behaviorParameters = obstruction ? sound_obstruct_behavior_parameters[soundParameters.behavior] : sound_behavior_parameters[soundParameters.behavior];
+
+	//This is the AL_LINEAR_DISTANCE_CLAMPED function we simulate
+	distance = std::max(distance, behaviorParameters.distance_reference);
+	distance = std::min(distance, behaviorParameters.distance_max);
+	float volume = 1 - behaviorParameters.rolloff_factor * (distance - behaviorParameters.distance_reference) / (behaviorParameters.distance_max - behaviorParameters.distance_reference);
+
+	return volume;
+}
+
 void SoundPlayer::UpdateParameters(SoundParameters parameters) {
 	std::lock_guard<std::mutex> guard(mutex_internal);
 	this->parameters = parameters;

@@ -131,30 +131,6 @@ void OpenALManager::SetDefaultVolume(float volume) {
 	default_volume = volume;
 }
 
-//Simulate what the volume of our sound would be if we play it
-//If the volume is 0 then we just don't play the sound and drop it
-bool OpenALManager::SimulateSound(SoundParameters soundParameters) const {
-	if (soundParameters.local && !soundParameters.stereo_parameters.is_panning) return true; //ofc we play all local sounds without stereo panning
-	if (soundParameters.stereo_parameters.is_panning) return soundParameters.stereo_parameters.gain_global > 0;
-
-	auto listener = OpenALManager::Get()->GetListener(); //if we don't have a listener on a non local sound, there is a problem
-	float distance = std::sqrt(
-		std::pow((float)(soundParameters.source_location3d.point.x - listener.point.x) / WORLD_ONE, 2) +
-		std::pow((float)(soundParameters.source_location3d.point.y - listener.point.y) / WORLD_ONE, 2) +
-		std::pow((float)(soundParameters.source_location3d.point.z - listener.point.z) / WORLD_ONE, 2)
-	);
-
-	bool obstruction = (soundParameters.obstruction_flags & _sound_was_obstructed) || (soundParameters.obstruction_flags & _sound_was_media_obstructed);
-	auto behaviorParameters = obstruction ? SoundPlayer::sound_obstruct_behavior_parameters[soundParameters.behavior] : SoundPlayer::sound_behavior_parameters[soundParameters.behavior];
-
-	//This is the AL_LINEAR_DISTANCE_CLAMPED function we simulate
-	distance = std::max(distance, behaviorParameters.distance_reference);
-	distance = std::min(distance, behaviorParameters.distance_max);
-	float volume = 1 - behaviorParameters.rolloff_factor * (distance - behaviorParameters.distance_reference) / (behaviorParameters.distance_max - behaviorParameters.distance_reference);
-
-	return volume > 0;
-}
-
 void OpenALManager::QueueAudio(std::shared_ptr<AudioPlayer> audioPlayer) {
 	std::lock_guard<std::mutex> guard(mutex_player);
 	audio_players.push_back(audioPlayer);
@@ -166,8 +142,8 @@ void OpenALManager::QueueAudio(std::shared_ptr<AudioPlayer> audioPlayer) {
 std::shared_ptr<SoundPlayer> OpenALManager::GetSoundPlayer(short identifier, short source_identifier, bool sound_identifier_only) const {
 	std::lock_guard<std::mutex> guard(mutex_player);
 	auto player = std::find_if(std::begin(audio_players), std::end(audio_players),
-		[&identifier, &source_identifier, &sound_identifier_only] (const std::shared_ptr<AudioPlayer> player) ->
-		short {return identifier != NONE && player->GetIdentifier() == identifier && 
+		[&identifier, &source_identifier, &sound_identifier_only] (const std::shared_ptr<AudioPlayer> player)
+		{return identifier != NONE && player->GetIdentifier() == identifier && 
 		(sound_identifier_only || player->GetSourceIdentifier() == source_identifier); });
 
 	return player != audio_players.end() ? std::dynamic_pointer_cast<SoundPlayer>(*player) : std::shared_ptr<SoundPlayer>(); //only sounds are supported, not musics
@@ -177,7 +153,7 @@ std::shared_ptr<SoundPlayer> OpenALManager::GetSoundPlayer(short identifier, sho
 //We will fill the buffer queue with this sound
 std::shared_ptr<SoundPlayer> OpenALManager::PlaySound(const SoundInfo& header, const SoundData& data, SoundParameters parameters) {
 	auto soundPlayer = std::shared_ptr<SoundPlayer>();
-	if (!consuming_audio_enable || !SimulateSound(parameters)) return soundPlayer;
+	if (!consuming_audio_enable || SoundPlayer::Simulate(parameters) <= 0) return soundPlayer;
 
 	//We have to play a sound, but let's find out first if we don't have a player with the source we would need
 	if (!(parameters.flags & _sound_does_not_self_abort)) {
@@ -237,11 +213,18 @@ std::shared_ptr<CallBackableStreamPlayer> OpenALManager::PlayStream(CallBackStre
 //It's not a good idea generating dynamically a new source for each player
 //It's slow so it's better having a pool, also we already know the max amount
 //of supported simultaneous playing sources for the device
-//Should we support the "run out of sources" process a bit more efficiently
-//than not playing the source if there is no more available ?
-AudioPlayer::AudioSource OpenALManager::PickAvailableSource() {
+AudioPlayer::AudioSource OpenALManager::PickAvailableSource(const AudioPlayer* player) {
 	std::lock_guard<std::mutex> guard(mutex_source);
-	if (sources_pool.empty()) return {};
+	if (sources_pool.empty()) {
+		const auto victimPlayer = std::min_element(audio_players.begin(), audio_players.end(),
+			[](const std::shared_ptr<AudioPlayer>& a, const std::shared_ptr<AudioPlayer>& b) {  return a->GetPriority() < b->GetPriority(); })->get();
+
+		if (victimPlayer->GetPriority() < player->GetPriority()) {
+			return victimPlayer->RetrieveSource();
+		}
+
+		return {};
+	}
 	auto source = sources_pool.front();
 	sources_pool.pop();
 	return source;

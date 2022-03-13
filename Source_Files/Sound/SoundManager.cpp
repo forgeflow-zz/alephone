@@ -447,7 +447,7 @@ void SoundManager::ManagePlayers() {
 
 			auto parameters = sound->get()->GetParameters();
 
-			if (parameters.loop && !OpenALManager::Get()->SimulateSound(sound->get()->GetParameters())) {
+			if (parameters.loop && SoundPlayer::Simulate(sound->get()->GetParameters()) <= 0) {
 				sound->get()->Stop();
 			}
 			else if (!parameters.local) {

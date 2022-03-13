@@ -40,6 +40,8 @@ public:
 	short GetIdentifier() const { return parameters.identifier; }
 	short GetSourceIdentifier() const { return parameters.source_identifier; }
 	SoundParameters GetParameters() const { return parameters; }
+	static float Simulate(SoundParameters soundParameters);
+	float GetPriority() const { return Simulate(parameters); }
 private:
 	void Rewind();
 	int GetNextData(uint8* data, int length);
