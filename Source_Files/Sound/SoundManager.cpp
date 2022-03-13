@@ -771,7 +771,7 @@ void SoundManager::SetStatus(bool active)
 
 				if (shell_options.nosound) return;
 
-				bool success = OpenALManager::Init((AudioBackend)parameters.audio_backend, parameters.flags & _hrtf_flag, 
+				bool success = OpenALManager::Init((AudioBackend)parameters.audio_backend, parameters.flags & _3d_sounds_flag, parameters.flags & _hrtf_flag,
 									!(parameters.flags & _zero_restart_delay), parameters.rate, parameters.flags & _stereo_flag,
 									OpenALManager::From_db(parameters.volume_db));
 

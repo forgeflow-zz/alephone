@@ -88,6 +88,9 @@ bool SoundPlayer::SetUpALSourceIdle() const {
 			alSource3f(audio_source.source, AL_POSITION, pan, 0, -sqrtf(1.0f - pan * pan));
 			vol *= parameters.stereo_parameters.gain_global;
 		}
+		else {
+			alSource3i(audio_source.source, AL_POSITION, 0, 0, 0);
+		}
 
 		alSourcef(audio_source.source, AL_GAIN, vol);
 		alSourcef(audio_source.source, AL_MAX_GAIN, vol);
