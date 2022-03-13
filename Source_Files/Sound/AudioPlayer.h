@@ -54,6 +54,7 @@ public:
     void SetFilterable(bool filterable) { this->filterable = filterable; }
     void Lock() { mutex_public.lock(); }
     void Unlock() { mutex_public.unlock(); }
+    virtual float GetPriority() const = 0;
 protected:
     AudioPlayer(int rate, bool stereo, bool sixteen_bit);
     void UnqueueBuffers();
