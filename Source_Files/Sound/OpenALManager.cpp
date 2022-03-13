@@ -16,7 +16,7 @@ OpenALManager* OpenALManager::Get() {
 
 //I won't support device switch with OpenAL as backend until their next release at least,
 //so it's better to stay with SDLAudio as renderer for now
-bool OpenALManager::Init(SoundManager::AudioBackend backend, bool hrtf_support, bool balance_rewind_sound, int rate, bool stereo, float volume) {
+bool OpenALManager::Init(SoundManager::AudioBackend backend, bool _3d_sounds, bool hrtf_support, bool balance_rewind_sound, int rate, bool stereo, float volume) {
 
 	if (instance) {
 		delete instance;
@@ -37,10 +37,10 @@ bool OpenALManager::Init(SoundManager::AudioBackend backend, bool hrtf_support, 
 	switch (backend) {
 	case SoundManager::AudioBackend::OpenAL:
 	default:
-		instance = new OpenALManager(hrtf_support, balance_rewind_sound, rate, stereo, volume);
+		instance = new OpenALManager(_3d_sounds, hrtf_support, balance_rewind_sound, rate, stereo, volume);
 		break;
 	case SoundManager::AudioBackend::SDLAudio:
-		instance = new OpenALManager::SDLBackend(hrtf_support, balance_rewind_sound, rate, stereo, volume);
+		instance = new OpenALManager::SDLBackend(_3d_sounds, hrtf_support, balance_rewind_sound, rate, stereo, volume);
 		break;
 	}
 
@@ -156,13 +156,14 @@ std::shared_ptr<SoundPlayer> OpenALManager::GetSoundPlayer(short identifier, sho
 //We will fill the buffer queue with this sound
 std::shared_ptr<SoundPlayer> OpenALManager::PlaySound(const SoundInfo& header, const SoundData& data, SoundParameters parameters) {
 	auto soundPlayer = std::shared_ptr<SoundPlayer>();
-	if (!consuming_audio_enable || SoundPlayer::Simulate(parameters) <= 0) return soundPlayer;
+	const float simulatedVolume = SoundPlayer::Simulate(parameters);
+	if (!consuming_audio_enable || simulatedVolume <= 0) return soundPlayer;
 
 	//We have to play a sound, but let's find out first if we don't have a player with the source we would need
 	if (!(parameters.flags & _sound_does_not_self_abort)) {
-		auto existingPlayer = GetSoundPlayer(parameters.identifier, parameters.source_identifier, (parameters.flags & _sound_cannot_be_restarted));
+		auto existingPlayer = GetSoundPlayer(parameters.identifier, parameters.source_identifier, !parameter_3d_sounds || (parameters.flags & _sound_cannot_be_restarted));
 		if (existingPlayer) {
-			if (!(parameters.flags & _sound_cannot_be_restarted)) {
+			if (!(parameters.flags & _sound_cannot_be_restarted) && simulatedVolume + abortAmplitudeThreshold > SoundPlayer::Simulate(existingPlayer->parameters)) {
 				existingPlayer->AskRewind(); //we found one, we won't create another player but rewind this one instead
 				existingPlayer->UpdateParameters(parameters);
 			}
@@ -234,7 +235,7 @@ AudioPlayer::AudioSource OpenALManager::PickAvailableSource(const AudioPlayer* p
 }
 
 void OpenALManager::StopSound(short sound_identifier, short source_identifier) {
-	auto player = GetSoundPlayer(sound_identifier, source_identifier);
+	auto player = GetSoundPlayer(sound_identifier, source_identifier, !parameter_3d_sounds);
 	if (player) player->Stop();
 }
 
@@ -442,7 +443,8 @@ bool OpenALManager::GenerateSources() {
 	return !sources_id.empty();
 }
 
-OpenALManager::OpenALManager(bool hrtf_support, bool balance_rewind_sound, int rate, bool stereo, float volume) {
+OpenALManager::OpenALManager(bool _3d_sounds, bool hrtf_support, bool balance_rewind_sound, int rate, bool stereo, float volume) {
+	parameter_3d_sounds = _3d_sounds;
 	parameter_hrtf = hrtf_support;
 	parameter_balance_rewind = balance_rewind_sound;
 	parameter_rate = rate;
@@ -507,8 +509,8 @@ OpenALManager::~OpenALManager() {
 }
 
 /* SDL as audio renderer part */
-OpenALManager::SDLBackend::SDLBackend(bool hrtf_support, bool balance_rewind_sound, int rate, bool stereo, float volume)
-	: OpenALManager(hrtf_support, balance_rewind_sound, rate, stereo, volume) {
+OpenALManager::SDLBackend::SDLBackend(bool _3d_sounds, bool hrtf_support, bool balance_rewind_sound, int rate, bool stereo, float volume)
+	: OpenALManager(_3d_sounds, hrtf_support, balance_rewind_sound, rate, stereo, volume) {
 
 	auto openalFormat = GetBestOpenALRenderingFormat(rate, stereo ? ALC_STEREO_SOFT : ALC_MONO_SOFT);
 	assert(openalFormat && "Audio format not found or not supported");

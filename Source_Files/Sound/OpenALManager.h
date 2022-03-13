@@ -17,8 +17,9 @@
 
 #define LOAD_PROC(T, x)  ((x) = (T)alGetProcAddress(#x))
 
+constexpr float abortAmplitudeThreshold = MAXIMUM_SOUND_VOLUME / 6.f / 256;
 constexpr float angleConvert = 360 / float(FULL_CIRCLE);
-constexpr float degreToRadian = M_PI / 180.0;
+constexpr float degreToRadian = M_PI / 180.f;
 
 #ifdef  HAVE_FFMPEG
 #ifdef __cplusplus
@@ -42,7 +43,7 @@ const std::unordered_map<ALCint, AVSampleFormat> mapping_openal_ffmpeg = {
 class OpenALManager {
 public:
 	static OpenALManager* Get();
-	static bool Init(SoundManager::AudioBackend backend, bool hrtf_support, bool balance_rewind_sound, int rate, bool stereo, float default_volume);
+	static bool Init(SoundManager::AudioBackend backend, bool _3d_sounds, bool hrtf_support, bool balance_rewind_sound, int rate, bool stereo, float default_volume);
 	static float From_db(float db, bool music = false) { return db <= (SoundManager::MINIMUM_VOLUME_DB / (music ? 2 : 1)) ? 0 : std::pow(10.f, db / 20.f); }
 	virtual void Start();
 	virtual void Stop();
@@ -73,7 +74,7 @@ private:
 	static OpenALManager* instance;
 	ALCdevice* p_ALCDevice = nullptr;
 	ALCcontext* p_ALCContext = nullptr;
-	OpenALManager(bool hrtf_support, bool balance_rewind_sound, int rate, bool stereo, float volume);
+	OpenALManager(bool _3d_sounds, bool hrtf_support, bool balance_rewind_sound, int rate, bool stereo, float volume);
 	virtual ~OpenALManager();
 	std::queue<float> filters_volume;
 	std::atomic<float> default_volume;
@@ -100,6 +101,7 @@ private:
 	static LPALCRENDERSAMPLESSOFT alcRenderSamplesSOFT;
 
 	class SDLBackend;
+	bool parameter_3d_sounds;
 	bool parameter_balance_rewind;
 	bool parameter_hrtf;
 	int parameter_rate;
@@ -120,7 +122,7 @@ private:
 
 class OpenALManager::SDLBackend : public OpenALManager {
 public:
-	SDLBackend(bool hrtf_support, bool balance_rewind_sound, int rate, bool stereo, float volume);
+	SDLBackend(bool _3d_sounds, bool hrtf_support, bool balance_rewind_sound, int rate, bool stereo, float volume);
 	~SDLBackend();
 
 	void SetUpRecordingDevice();
