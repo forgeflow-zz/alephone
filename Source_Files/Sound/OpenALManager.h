@@ -17,37 +17,6 @@
 
 #define LOAD_PROC(T, x)  ((x) = (T)alGetProcAddress(#x))
 
-/* Loopback device functions (SDL backend and video export) */
-static LPALCLOOPBACKOPENDEVICESOFT alcLoopbackOpenDeviceSOFT;
-static LPALCISRENDERFORMATSUPPORTEDSOFT alcIsRenderFormatSupportedSOFT;
-static LPALCRENDERSAMPLESSOFT alcRenderSamplesSOFT;
-
-/* Effect object functions */
-static LPALGENEFFECTS alGenEffects;
-static LPALDELETEEFFECTS alDeleteEffects;
-static LPALISEFFECT alIsEffect;
-static LPALEFFECTI alEffecti;
-static LPALEFFECTIV alEffectiv;
-static LPALEFFECTF alEffectf;
-static LPALEFFECTFV alEffectfv;
-static LPALGETEFFECTI alGetEffecti;
-static LPALGETEFFECTIV alGetEffectiv;
-static LPALGETEFFECTF alGetEffectf;
-static LPALGETEFFECTFV alGetEffectfv;
-
-/* Auxiliary Effect Slot object functions */
-static LPALGENAUXILIARYEFFECTSLOTS alGenAuxiliaryEffectSlots;
-static LPALDELETEAUXILIARYEFFECTSLOTS alDeleteAuxiliaryEffectSlots;
-static LPALISAUXILIARYEFFECTSLOT alIsAuxiliaryEffectSlot;
-static LPALAUXILIARYEFFECTSLOTI alAuxiliaryEffectSloti;
-static LPALAUXILIARYEFFECTSLOTIV alAuxiliaryEffectSlotiv;
-static LPALAUXILIARYEFFECTSLOTF alAuxiliaryEffectSlotf;
-static LPALAUXILIARYEFFECTSLOTFV alAuxiliaryEffectSlotfv;
-static LPALGETAUXILIARYEFFECTSLOTI alGetAuxiliaryEffectSloti;
-static LPALGETAUXILIARYEFFECTSLOTIV alGetAuxiliaryEffectSlotiv;
-static LPALGETAUXILIARYEFFECTSLOTF alGetAuxiliaryEffectSlotf;
-static LPALGETAUXILIARYEFFECTSLOTFV alGetAuxiliaryEffectSlotfv;
-
 constexpr float angleConvert = 360 / float(FULL_CIRCLE);
 constexpr float degreToRadian = M_PI / 180.0;
 
@@ -109,8 +78,6 @@ private:
 	std::queue<float> filters_volume;
 	std::atomic<float> default_volume;
 	world_location3d listener_location = {};
-	bool is_supporting_EFX;
-	void LoadEFX();
 	void CleanEverything();
 	bool GenerateSources();
 	virtual bool OpenPlayingDevice();
@@ -126,6 +93,11 @@ private:
 	std::deque<std::shared_ptr<AudioPlayer>> audio_players;
 	int GetBestOpenALRenderingFormat(int rate, ALCint channelsType);
 	void RetrieveSource(std::shared_ptr<AudioPlayer> player);
+
+	/* Loopback device functions (SDL backend and video export) */
+	static LPALCLOOPBACKOPENDEVICESOFT alcLoopbackOpenDeviceSOFT;
+	static LPALCISRENDERFORMATSUPPORTEDSOFT alcIsRenderFormatSupportedSOFT;
+	static LPALCRENDERSAMPLESSOFT alcRenderSamplesSOFT;
 
 	class SDLBackend;
 	bool parameter_balance_rewind;

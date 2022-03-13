@@ -3,6 +3,9 @@
 #include "Logging.h"
 
 //TODO: manage openal device disconnected with openal renderer (won't do before next openal release at least)
+LPALCLOOPBACKOPENDEVICESOFT OpenALManager::alcLoopbackOpenDeviceSOFT;
+LPALCISRENDERFORMATSUPPORTEDSOFT OpenALManager::alcIsRenderFormatSupportedSOFT;
+LPALCRENDERSAMPLESSOFT OpenALManager::alcRenderSamplesSOFT;
 
 std::mutex mutex_player;
 std::mutex mutex_source;
@@ -301,43 +304,10 @@ bool OpenALManager::OpenRecordingDevice() {
 			return false;
 		}
 
-		LoadEFX();
 		return true;
 	}
 
 	return false;
-}
-
-void OpenALManager::LoadEFX() {
-
-	is_supporting_EFX = alcIsExtensionPresent(instance->p_ALCDevice, "ALC_EXT_EFX");
-
-	if (is_supporting_EFX) {
-
-		LOAD_PROC(LPALGENEFFECTS, alGenEffects);
-		LOAD_PROC(LPALDELETEEFFECTS, alDeleteEffects);
-		LOAD_PROC(LPALISEFFECT, alIsEffect);
-		LOAD_PROC(LPALEFFECTI, alEffecti);
-		LOAD_PROC(LPALEFFECTIV, alEffectiv);
-		LOAD_PROC(LPALEFFECTF, alEffectf);
-		LOAD_PROC(LPALEFFECTFV, alEffectfv);
-		LOAD_PROC(LPALGETEFFECTI, alGetEffecti);
-		LOAD_PROC(LPALGETEFFECTIV, alGetEffectiv);
-		LOAD_PROC(LPALGETEFFECTF, alGetEffectf);
-		LOAD_PROC(LPALGETEFFECTFV, alGetEffectfv);
-
-		LOAD_PROC(LPALGENAUXILIARYEFFECTSLOTS, alGenAuxiliaryEffectSlots);
-		LOAD_PROC(LPALDELETEAUXILIARYEFFECTSLOTS, alDeleteAuxiliaryEffectSlots);
-		LOAD_PROC(LPALISAUXILIARYEFFECTSLOT, alIsAuxiliaryEffectSlot);
-		LOAD_PROC(LPALAUXILIARYEFFECTSLOTI, alAuxiliaryEffectSloti);
-		LOAD_PROC(LPALAUXILIARYEFFECTSLOTIV, alAuxiliaryEffectSlotiv);
-		LOAD_PROC(LPALAUXILIARYEFFECTSLOTF, alAuxiliaryEffectSlotf);
-		LOAD_PROC(LPALAUXILIARYEFFECTSLOTFV, alAuxiliaryEffectSlotfv);
-		LOAD_PROC(LPALGETAUXILIARYEFFECTSLOTI, alGetAuxiliaryEffectSloti);
-		LOAD_PROC(LPALGETAUXILIARYEFFECTSLOTIV, alGetAuxiliaryEffectSlotiv);
-		LOAD_PROC(LPALGETAUXILIARYEFFECTSLOTF, alGetAuxiliaryEffectSlotf);
-		LOAD_PROC(LPALGETAUXILIARYEFFECTSLOTFV, alGetAuxiliaryEffectSlotfv);
-	}
 }
 
 //This return true if the device support switching from hrtf enabled <-> hrtf disabled
@@ -383,7 +353,6 @@ bool OpenALManager::OpenPlayingDevice() {
 		return false;
 	}
 
-	LoadEFX();
 	return true;
 }
 
