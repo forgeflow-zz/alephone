@@ -53,7 +53,7 @@ void CallBackableStreamPlayer::FillBuffers() {
 
 			if (data.size() <= 0) return;
 			alBufferData(buffer.buffer_id, format, data.data(), data.size(), rate);
-			alSourceQueueBuffers(audio_source.source, 1, &buffer.buffer_id);
+			alSourceQueueBuffers(audio_source.source_id, 1, &buffer.buffer_id);
 			buffer.queue_state = true;
 		}
 	}
