@@ -346,7 +346,11 @@ bool OpenALManager::OpenPlayingDevice() {
 		return false;
 	}
 
-	ALCint attrs[] = { ALC_HRTF_SOFT, audio_parameters.hrtf, 0 };
+	ALCint attrs[] = { //Cannot request OpenAL to render mono or stereo
+		ALC_HRTF_SOFT, audio_parameters.hrtf,
+		ALC_FREQUENCY, audio_parameters.rate,
+		0
+	};
 
 	p_ALCContext = alcCreateContext(p_ALCDevice, attrs);
 	if (!p_ALCContext) {
