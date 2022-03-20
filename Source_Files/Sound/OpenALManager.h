@@ -40,10 +40,19 @@ const std::unordered_map<ALCint, AVSampleFormat> mapping_openal_ffmpeg = {
 
 #endif //  HAVE_FFMPEG
 
+struct AudioParameters {
+	int rate;
+	bool stereo;
+	bool balance_rewind;
+	bool hrtf;
+	bool sounds_3d;
+	float volume;
+};
+
 class OpenALManager {
 public:
 	static OpenALManager* Get();
-	static bool Init(SoundManager::AudioBackend backend, bool _3d_sounds, bool hrtf_support, bool balance_rewind_sound, int rate, bool stereo, float default_volume);
+	static bool Init(SoundManager::AudioBackend backend, AudioParameters parameters);
 	static float From_db(float db, bool music = false) { return db <= (SoundManager::MINIMUM_VOLUME_DB / (music ? 2 : 1)) ? 0 : std::pow(10.f, db / 20.f); }
 	virtual void Start();
 	virtual void Stop();
@@ -62,19 +71,20 @@ public:
 	float GetComputedVolume(bool filtered = true) const { return default_volume * (filters_volume.empty() || !filtered ? 1 : filters_volume.front()); }
 	virtual void SetUpRecordingDevice();
 	virtual void SetUpPlayingDevice();
-	virtual int GetFrequency() const;
+	int GetFrequency() const;
 	void GetPlayBackAudio(uint8* data, int length);
 	void ApplyVolumeFilter(float volume_filter) { filters_volume.push(volume_filter); }
 	void RemoveVolumeFilter() { if(!filters_volume.empty()) filters_volume.pop(); }
 	bool Support_HRTF_Toggling() const;
 	bool Is_HRTF_Enabled() const;
-	bool IsBalanceRewindSound() const { return parameter_balance_rewind; }
+	bool IsBalanceRewindSound() const { return audio_parameters.balance_rewind; }
 	ALCint GetRenderingFormat() const { return rendering_format; }
 private:
 	static OpenALManager* instance;
+	SoundManager::AudioBackend audio_backend;
 	ALCdevice* p_ALCDevice = nullptr;
 	ALCcontext* p_ALCContext = nullptr;
-	OpenALManager(bool _3d_sounds, bool hrtf_support, bool balance_rewind_sound, int rate, bool stereo, float volume);
+	OpenALManager(AudioParameters parameters);
 	virtual ~OpenALManager();
 	std::queue<float> filters_volume;
 	std::atomic<float> default_volume;
@@ -92,7 +102,7 @@ private:
 	std::thread process_consuming_audio;
 	std::queue<AudioPlayer::AudioSource> sources_pool;
 	std::deque<std::shared_ptr<AudioPlayer>> audio_players;
-	int GetBestOpenALRenderingFormat(int rate, ALCint channelsType);
+	int GetBestOpenALRenderingFormat(ALCint channelsType);
 	void RetrieveSource(std::shared_ptr<AudioPlayer> player);
 
 	/* Loopback device functions (SDL backend and video export) */
@@ -101,11 +111,7 @@ private:
 	static LPALCRENDERSAMPLESSOFT alcRenderSamplesSOFT;
 
 	class SDLBackend;
-	bool parameter_3d_sounds;
-	bool parameter_balance_rewind;
-	bool parameter_hrtf;
-	int parameter_rate;
-	bool parameter_stereo;
+	AudioParameters audio_parameters;
 	ALCint rendering_format = 0;
 
 	/* format type we supports for mixing / rendering
@@ -122,12 +128,11 @@ private:
 
 class OpenALManager::SDLBackend : public OpenALManager {
 public:
-	SDLBackend(bool _3d_sounds, bool hrtf_support, bool balance_rewind_sound, int rate, bool stereo, float volume);
+	SDLBackend(AudioParameters parameters);
 	~SDLBackend();
 
 	void SetUpRecordingDevice();
 	void SetUpPlayingDevice();
-	int GetFrequency() const;
 	void Start();
 	void Stop();
 private:

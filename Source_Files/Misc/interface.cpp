@@ -3090,7 +3090,6 @@ static SDL_mutex *movie_audio_mutex = NULL;
 static const int AUDIO_BUF_SIZE = 10;
 static SDL_ffmpegAudioFrame *aframes[AUDIO_BUF_SIZE];
 static uint64_t movie_sync = 0;
-static std::shared_ptr<CallBackableStreamPlayer> movie_audio_player = nullptr;
 static SDL_AudioSpec specs;
 int movie_audio_callback(uint8* stream, int length)
 {
@@ -3185,10 +3184,10 @@ void show_movie(short index)
 		if (OGL_IsActive())
 			OGL_ClearScreen();
 #endif
-		
 		OpenALManager::Get()->Start();
 		bool done = false;
 		int64_t movie_waudio_sync = 0;
+		std::shared_ptr<CallBackableStreamPlayer> movie_audio_player;
 		while (!done)
 		{
 			SDL_Event event;
@@ -3263,6 +3262,13 @@ void show_movie(short index)
 			}
 		}
 
+		while (movie_audio_player->IsActive()) {
+			sleep_for_machine_ticks(MACHINE_TICKS_PER_SECOND / 100);
+		}
+
+		OpenALManager::Get()->Stop();
+		movie_audio_player.reset();
+
 		if (astream)
 		{
 			for (int i = 0; i < AUDIO_BUF_SIZE; i++)
@@ -3276,14 +3282,6 @@ void show_movie(short index)
 		if (vframe)
 			SDL_ffmpegFreeVideoFrame(vframe);
 		SDL_ffmpegFree(sffile);
-
-		while (movie_audio_player->IsActive()) {
-			sleep_for_machine_ticks(10);
-		}
-		sleep_for_machine_ticks(1000); // assuring sound is done playing
-
-		OpenALManager::Get()->Stop();
-		movie_audio_player.reset();
 
 #elif defined(HAVE_SMPEG) // end HAVE_FFMPEG
 		
