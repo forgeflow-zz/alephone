@@ -26,7 +26,7 @@ private:
     };
 
     struct AudioSource {
-        ALuint source = 0; //Source used by this player
+        ALuint source_id = 0; //Source used by this player
         AudioPlayerBuffer buffers[num_buffers]; //this is just because it's a bit hard to know which buffer is queued and which is not without that
     };
 

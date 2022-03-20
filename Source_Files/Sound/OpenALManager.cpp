@@ -259,7 +259,7 @@ void OpenALManager::StopAllPlayers() {
 void OpenALManager::RetrieveSource(std::shared_ptr<AudioPlayer> player) {
 	std::lock_guard<std::mutex> guard(mutex_source);
 	auto audioSource = player->RetrieveSource();
-	if (audioSource.source) sources_pool.push(audioSource);
+	if (audioSource.source_id) sources_pool.push(audioSource);
 	player->Stop();
 }
 
@@ -431,7 +431,7 @@ bool OpenALManager::GenerateSources() {
 		}
 
 		AudioPlayer::AudioSource audioSource;
-		audioSource.source = source_id;
+		audioSource.source_id = source_id;
 		ALuint buffers_id[num_buffers];
 		alGenBuffers(num_buffers, buffers_id);
 		if (alGetError() != AL_NO_ERROR) {
@@ -462,7 +462,7 @@ void OpenALManager::CleanEverything() {
 
 	while (!sources_pool.empty()) {
 		const auto& audioSource = sources_pool.front();
-		alDeleteSources(1, &audioSource.source);
+		alDeleteSources(1, &audioSource.source_id);
 
 		for (int i = 0; i < num_buffers; i++) {
 			alDeleteBuffers(1, &audioSource.buffers[i].buffer_id);
