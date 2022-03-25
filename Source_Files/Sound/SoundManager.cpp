@@ -711,8 +711,7 @@ SoundManager::Parameters::Parameters() :
 	music_db(DEFAULT_MUSIC_LEVEL_DB),
 	volume_while_speaking(DEFAULT_VOLUME_WHILE_SPEAKING),
 	mute_while_transmitting(true),
-	video_export_volume_db(DEFAULT_VIDEO_EXPORT_VOLUME_DB),
-	audio_backend(AudioBackend::SDLAudio)
+	video_export_volume_db(DEFAULT_VIDEO_EXPORT_VOLUME_DB)
 {
 }
 
@@ -780,7 +779,7 @@ void SoundManager::SetStatus(bool active)
 					OpenALManager::From_db(parameters.volume_db)
 				};
 
-				bool success = OpenALManager::Init((AudioBackend)parameters.audio_backend, audio_parameters);
+				bool success = OpenALManager::Init(audio_parameters);
 
 				if (!success) return;
 

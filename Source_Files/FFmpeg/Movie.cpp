@@ -210,10 +210,10 @@ void Movie::StartRecording(std::string path)
 	moviefile = path;
     OpenALManager::Get()->Stop();
     if (IsRecording()) {
-        OpenALManager::Get()->SetUpRecordingDevice();
+        OpenALManager::Get()->ToggleDeviceMode(true);
     }
     else {
-        OpenALManager::Get()->SetUpPlayingDevice();
+        OpenALManager::Get()->ToggleDeviceMode(false);
     }
     OpenALManager::Get()->Start();
 }
@@ -866,7 +866,7 @@ void Movie::StopRecording()
 
 	moviefile = "";
     if (OpenALManager::Get()) {
-        OpenALManager::Get()->SetUpPlayingDevice();
+        OpenALManager::Get()->ToggleDeviceMode(false);
         OpenALManager::Get()->Start();
     }
 }

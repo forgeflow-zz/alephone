@@ -1471,10 +1471,6 @@ static void sound_dialog(void *arg)
 	table_placer *table = new table_placer(2, get_theme_space(ITEM_WIDGET), true);
 	table->col_flags(0, placeable::kAlignRight);
 
-	w_toggle* audio_renderer_w = new w_toggle(sound_preferences->audio_backend != SoundManager::AudioBackend::SDLAudio, renderer_audio_labels);
-	table->dual_add(audio_renderer_w->label("Rendering System"), d);
-	table->dual_add(audio_renderer_w, d);
-
 	static const char *quality_labels[3] = {"8 Bit", "16 Bit", NULL};
 	w_toggle *quality_w = new w_toggle(TEST_FLAG(sound_preferences->flags, _16bit_sound_flag), quality_labels);
 	table->dual_add(quality_w->label("Quality"), d);
@@ -1582,23 +1578,6 @@ static void sound_dialog(void *arg)
 		if (mute_while_transmitting != sound_preferences->mute_while_transmitting)
 		{
 			sound_preferences->mute_while_transmitting = mute_while_transmitting;
-			changed = true;
-		}
-
-		size_t sdlBackend = audio_renderer_w->get_selection();
-		SoundManager::AudioBackend currentAudioBackend = (SoundManager::AudioBackend)sound_preferences->audio_backend;
-		SoundManager::AudioBackend selectedAudioBackend;
-		switch (sdlBackend) {
-		case 1:
-			selectedAudioBackend = SoundManager::AudioBackend::OpenAL;
-			break;
-		default:
-			selectedAudioBackend = SoundManager::AudioBackend::SDLAudio;
-			break;
-		}
-
-		if (currentAudioBackend != selectedAudioBackend) {
-			sound_preferences->audio_backend = selectedAudioBackend;
 			changed = true;
 		}
 
@@ -3722,7 +3701,6 @@ InfoTree sound_preferences_tree()
 	root.put_attr("volume_while_speaking", sound_preferences->volume_while_speaking);
 	root.put_attr("mute_while_transmitting", sound_preferences->mute_while_transmitting);
 	root.put_attr("video_export_volume_db", sound_preferences->video_export_volume_db);
-	root.put_attr("audio_backend", sound_preferences->audio_backend);
 
 	return root;
 }
@@ -4715,7 +4693,6 @@ void parse_sound_preferences(InfoTree root, std::string version)
 	root.read_attr("volume_while_speaking", sound_preferences->volume_while_speaking);
 	root.read_attr("mute_while_transmitting", sound_preferences->mute_while_transmitting);
 	root.read_attr("video_export_volume_db", sound_preferences->video_export_volume_db);
-	root.read_attr("audio_backend", sound_preferences->audio_backend);
 }
 
 
